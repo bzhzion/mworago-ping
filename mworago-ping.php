@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Mworago Ping
  * Description: Extension de WordPress Popular Posts — comptabilise les lectures depuis l'app Mworago directement dans les tables WPP.
- * Version:     2.3.0
+ * Version:     2.4.0
  * Author:      Breizhzion
  * Author URI: https://breizhzion.com
  *

@@ -111,6 +111,19 @@ function kpopify_ping_handle(WP_REST_Request $request): WP_REST_Response {
     $ip_hash  = md5(kpopify_ping_get_ip());
     $window   = kpopify_ping_burst_window();
 
+    // IDOR mineur : sans ce contrôle, un appelant peut "réchauffer" un post_id
+    // arbitraire (brouillon, VIP non encore publié, ID inexistant) avant que
+    // l'article ne soit réellement lu par personne. On n'accepte que les
+    // articles publiés (les posts `private` sont le modèle VIP intentionnel,
+    // ils restent comptabilisables une fois "publiés" au sens WP).
+    $post_status = get_post_status($post_id);
+    if ($post_status !== 'publish' && $post_status !== 'private') {
+        return new WP_REST_Response(['ok' => false, 'reason' => 'invalid_post'], 200);
+    }
+    if (get_post_type($post_id) !== 'post') {
+        return new WP_REST_Response(['ok' => false, 'reason' => 'invalid_post'], 200);
+    }
+
     // --- burst par IP ---
     $ip_burst_key = 'kpopify_ping_burst_ip_' . $ip_hash;
     $ip_burst     = kpopify_ping_atomic_incr($ip_burst_key, $window);

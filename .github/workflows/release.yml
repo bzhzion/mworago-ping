@@ -16,12 +16,9 @@ jobs:
 
       - name: Create zip
         run: |
-          mkdir -p dist
-          zip -r dist/mworago-ping.zip . \
-            --exclude "*.git*" \
-            --exclude ".github/*" \
-            --exclude "dist/*" \
-            --exclude "deploy.sh"
+          mkdir -p dist build/mworago-ping
+          rsync -a --exclude=".git*" --exclude=".github" --exclude="dist" --exclude="build" --exclude="deploy.sh" ./ build/mworago-ping/
+          cd build && zip -r ../dist/mworago-ping.zip mworago-ping
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

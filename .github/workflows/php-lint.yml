@@ -37,16 +37,31 @@ jobs:
         # bibliotheque livree pour une version de PHP differente ferait echouer le lint sans
         # que cela dise quoi que ce soit sur ce depot.
         #
-        # `-print0` et `xargs -0` plutot qu'une boucle sur les noms : un chemin contenant un
-        # espace casserait silencieusement le decoupage et sauterait le fichier.
+        # `read -d ''` sur un `-print0` plutot qu'une boucle sur les noms : un chemin contenant
+        # un espace casserait silencieusement le decoupage et sauterait le fichier.
+        #
+        # ON NE S'ARRETE PAS A LA PREMIERE ERREUR, et c'est deliberé. Une premiere version
+        # utilisait `xargs`, qui abandonne des qu'un fichier echoue : le premier passage sur
+        # nopost-theme a signale une erreur puis s'est arrete, laissant croire qu'il n'y en
+        # avait qu'une alors que rien ne le garantissait. Un controle qui masque le reste de
+        # ce qu'il a trouve oblige a le relancer autant de fois qu'il y a de fautes.
         run: |
-          set -euo pipefail
+          set -uo pipefail
           fichiers=$(find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' | wc -l)
           echo "$fichiers fichiers PHP a verifier"
           if [ "$fichiers" -eq 0 ]; then
             echo "Aucun fichier PHP : rien a verifier."
             exit 0
           fi
-          find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' -print0 \
-            | xargs -0 -n1 -P4 php -l
+          echec=0
+          while IFS= read -r -d '' f; do
+            if ! sortie=$(php -l "$f" 2>&1); then
+              echo "::error file=${f#./}::$sortie"
+              echec=$((echec + 1))
+            fi
+          done < <(find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' -print0)
+          if [ "$echec" -gt 0 ]; then
+            echo "$echec fichier(s) en erreur sur $fichiers."
+            exit 1
+          fi
           echo "Syntaxe valide sur les $fichiers fichiers."

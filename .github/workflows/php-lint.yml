@@ -1,0 +1,52 @@
+name: PHP lint
+
+# Verification pure, ne publie et ne deploie rien : elle reste donc volontairement sur push de
+# branche, conformement a la convention de parc (voir admin/docs/ci-versions-health.md, seuls
+# les workflows qui deploient sont limites aux tags et au declenchement manuel).
+#
+# Pourquoi ce workflow existe : une erreur de syntaxe dans le functions.php d'un theme
+# WordPress ne degrade pas une page, elle met TOUT le site en erreur fatale. Le cout d'une
+# faute de frappe est donc le site entier, pas un affichage casse. `php -l` parse sans
+# executer et sort en erreur : c'est le controle le moins cher qui existe pour ce risque.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: php -l
+    # Depot PUBLIC : les minutes GitHub sont gratuites, un runner hebergé suffit et l'image
+    # Ubuntu embarque deja PHP. Sur un depot PRIVE il faudrait un runner self-hosted, les
+    # minutes y etant facturees.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Version de PHP
+        run: php --version
+
+      - name: Verifier la syntaxe de tous les fichiers PHP
+        # `vendor/` est exclu : ce sont des dependances tierces, pas notre code, et une
+        # bibliotheque livree pour une version de PHP differente ferait echouer le lint sans
+        # que cela dise quoi que ce soit sur ce depot.
+        #
+        # `-print0` et `xargs -0` plutot qu'une boucle sur les noms : un chemin contenant un
+        # espace casserait silencieusement le decoupage et sauterait le fichier.
+        run: |
+          set -euo pipefail
+          fichiers=$(find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' | wc -l)
+          echo "$fichiers fichiers PHP a verifier"
+          if [ "$fichiers" -eq 0 ]; then
+            echo "Aucun fichier PHP : rien a verifier."
+            exit 0
+          fi
+          find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' -print0 \
+            | xargs -0 -n1 -P4 php -l
+          echo "Syntaxe valide sur les $fichiers fichiers."
